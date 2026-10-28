@@ -269,12 +269,17 @@ void* phNxpNciHal_client_thread(void* arg) {
 
   p_nxpncihal_ctrl->thread_running = 1;
 
+  /* Close zeroes gDrvCfg.nClientId before it joins this thread and releases
+   * the queue only after the join. Reading the field on every pass made the
+   * thread spin on msgrcv(0) (and log each pass) whenever a message was still
+   * queued ahead of NCI_HAL_CLOSE_CPLT_MSG, and the join never returned. */
+  intptr_t client_id = p_nxpncihal_ctrl->gDrvCfg.nClientId;
+
   while (p_nxpncihal_ctrl->thread_running == 1) {
     /* Fetch next message from the NFC stack message queue */
-    if (phDal4Nfc_msgrcv(p_nxpncihal_ctrl->gDrvCfg.nClientId, &msg, 0, 0) ==
-        -1) {
-      NXPLOG_NCIHAL_E("NFC client received bad message");
-      continue;
+    if (phDal4Nfc_msgrcv(client_id, &msg, 0, 0) == -1) {
+      NXPLOG_NCIHAL_E("NFC client received bad message, stopping");
+      break;
     }
 
     if (p_nxpncihal_ctrl->thread_running == 0) {
