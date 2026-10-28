@@ -500,6 +500,13 @@ static NFCSTATUS phNxpNciHal_force_fw_download(uint8_t seq_handler_offset,
       phOsalNfc_Timer_Cleanup();
       phNxpTempMgr::GetInstance().Reset();
       phTmlNfc_Shutdown_CleanUp();
+      /* The client thread is already running on this queue: stop it before
+       * the queue is freed. Any message wakes it to see thread_running. */
+      nxpncihal_ctrl.thread_running = 0;
+      phLibNfc_Message_t wake = {};
+      wake.eMsgType = NCI_HAL_ERROR_MSG;
+      phDal4Nfc_msgsnd(client_id, &wake, 0);
+      pthread_join(nxpncihal_ctrl.client_thread, (void**)NULL);
       phDal4Nfc_msgrelease(client_id);
       return NFCSTATUS_CMD_ABORTED;
     }
